@@ -7,6 +7,13 @@
 - Briefly describe your initial UML design.
 - What classes did you include, and what responsibilities did you assign to each?
 
+The initial design includes four classes: `Owner`, `Pet`, `Task`, and `Scheduler`.
+
+- `Owner` holds the pet owner's profile — their name, how many minutes per day they have available, their preferred time of day, and any notes. It is responsible for providing the time constraints the scheduler works within.
+- `Pet` holds the pet's basic information — name, species, age, and any special needs. It represents who the care plan is being built for and provides context that could influence task priorities.
+- `Task` represents a single care activity such as a walk, feeding, or medication. It holds the task name, category, duration, priority level, whether it recurs daily, and optional notes. It is responsible for describing what needs to be done and whether it can fit within available time.
+- `Scheduler` is the core logic class. It takes a list of tasks and the owner's available minutes, then generates a prioritized daily plan. It is responsible for sorting and filtering tasks and explaining why certain tasks were included or skipped.
+
 ```mermaid
 classDiagram
     class Owner {
@@ -56,6 +63,16 @@ classDiagram
 
 - Did your design change during implementation?
 - If yes, describe at least one change and why you made it.
+
+Yes, four changes were made after reviewing the initial skeleton:
+
+1. **Added a `Priority` enum** — `Task.priority` was originally a plain string, which meant nothing would stop invalid values like `"banana"` from being passed in, and sorting would be alphabetical rather than meaningful. Replacing it with a `Priority` enum (`HIGH=1`, `MEDIUM=2`, `LOW=3`) makes priority sorting correct and input safe.
+
+2. **`Scheduler` now takes `Owner` and `Pet` instead of raw `available_minutes`** — the original design passed only an integer, losing all owner and pet context (e.g. `preferred_time_of_day`, `special_needs`). These details should influence the plan, so the full objects are passed in instead.
+
+3. **Added `self.skipped` list to `Scheduler`** — `explain_reasoning()` had no data to work from. Without tracking which tasks were skipped and why during plan generation, the method could never produce a meaningful explanation. The `skipped` list gives it that state.
+
+4. **Renamed `is_schedulable(available_minutes)` to use `remaining_minutes`** — the original parameter name implied checking against total daily time, but the correct check is against how many minutes are *left* after already-scheduled tasks are accounted for.
 
 **c. Core user actions**
 
