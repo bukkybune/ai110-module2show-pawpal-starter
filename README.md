@@ -1,6 +1,43 @@
 # PawPal+ (Module 2 Project)
 
-You are building **PawPal+**, a Streamlit app that helps a pet owner plan care tasks for their pet.
+**PawPal+** is a Streamlit app that helps a busy pet owner plan and track daily care tasks across multiple pets — automatically scheduling by priority, detecting conflicts, and renewing recurring tasks.
+
+---
+
+## 📸 Demo
+
+<a href="/course_images/ai110/pawpal_screenshot.png" target="_blank"><img src='/course_images/ai110/pawpal_screenshot.png' title='PawPal App' width='' alt='PawPal App' class='center-block' /></a>
+
+---
+
+## Features
+
+### Owner & Pet Management
+- **Multi-pet support** — one owner can manage any number of pets, each with their own task list
+- **Pet profiles** — store name, species, age, and special needs per pet
+
+### Task Management
+- **Flexible task creation** — each task holds a name, category, duration, priority, optional scheduled time, recurrence setting, and notes
+- **Priority levels** — tasks are ranked `HIGH`, `MEDIUM`, or `LOW` using a type-safe enum, preventing invalid input
+
+### Scheduling Algorithms
+- **Priority-first scheduling** — `Scheduler.generate_plan()` sorts all tasks by priority and greedily fits them into the owner's available daily minutes; lower-priority tasks are skipped when time runs out
+- **Chronological sorting** — `sort_by_time()` orders tasks by their `HH:MM` scheduled time; tasks with no time set are placed at the end
+- **Status filtering** — `filter_by_status()` separates pending and completed tasks so the owner only sees what still needs doing
+- **Per-pet filtering** — `filter_by_pet()` returns the task list for a named pet (case-insensitive)
+
+### Conflict Detection
+- **Same-time conflict warnings** — `detect_conflicts()` scans all pending tasks and flags any two tasks assigned the same start time, surfacing the warning in the UI before the schedule is generated
+
+### Recurring Tasks
+- **Auto-renewal** — calling `complete_task()` on a recurring task marks it done and automatically adds the next occurrence to the same pet: +1 day for daily tasks, +7 days for weekly tasks
+
+### Streamlit UI
+- Conflict warnings appear as `st.error` banners with per-conflict `st.warning` detail lines
+- Pending tasks are displayed in a sorted table; completed tasks are collapsed into an expander
+- Schedule output uses `st.metric` for time summary and `st.warning` per skipped task
+
+---
 
 ## Scenario
 

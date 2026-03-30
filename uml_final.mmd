@@ -1,0 +1,67 @@
+classDiagram
+    class Priority {
+        <<enumeration>>
+        HIGH = 1
+        MEDIUM = 2
+        LOW = 3
+    }
+
+    class Owner {
+        +String name
+        +int available_minutes_per_day
+        +String preferred_time_of_day
+        +String notes
+        +List pets
+        +add_pet(pet)
+        +remove_pet(pet_name)
+        +get_all_tasks() List
+        +get_available_time() int
+    }
+
+    class Pet {
+        +String name
+        +String species
+        +int age
+        +String special_needs
+        +List tasks
+        +add_task(task)
+        +remove_task(task_name)
+        +get_tasks() List
+        +get_profile() String
+    }
+
+    class Task {
+        +String name
+        +String category
+        +int duration_minutes
+        +Priority priority
+        +bool is_recurring
+        +String frequency
+        +String notes
+        +bool is_complete
+        +String scheduled_time
+        +String due_date
+        +mark_complete()
+        +get_summary() String
+        +is_schedulable(remaining_minutes) bool
+    }
+
+    class Scheduler {
+        +Owner owner
+        +List skipped
+        +get_all_tasks() List
+        +sort_by_priority(tasks) List
+        +filter_by_priority(tasks, max_priority) List
+        +sort_by_time(tasks) List
+        +filter_by_status(tasks, completed) List
+        +filter_by_pet(pet_name) List
+        +detect_conflicts(tasks) List
+        +complete_task(task) Task
+        +generate_plan() List
+        +explain_reasoning() String
+    }
+
+    Owner "1" --> "*" Pet : owns
+    Pet "1" --> "*" Task : has
+    Scheduler "1" --> "1" Owner : reads
+    Task --> Priority : uses
