@@ -98,6 +98,10 @@ The three core actions a user should be able to perform in PawPal+:
 - Describe one tradeoff your scheduler makes.
 - Why is that tradeoff reasonable for this scenario?
 
+The conflict detector checks for exact `scheduled_time` matches (e.g., two tasks both set to `"08:00"`) but does not check for overlapping durations. In reality, a 30-minute task starting at `"07:00"` and a 15-minute task starting at `"07:15"` would overlap — but the scheduler would not flag this as a conflict.
+
+This tradeoff is reasonable for this scenario because the app is designed for a single owner managing a small number of daily pet care tasks, not a rigid minute-by-minute timetable. Exact-match detection catches the most common mistake (accidentally scheduling two things at the same time) without requiring the scheduler to track start and end windows for every task. Adding duration-overlap detection would make the logic significantly more complex and is unlikely to matter when tasks are loosely scheduled across a whole day.
+
 ---
 
 ## 3. AI Collaboration
