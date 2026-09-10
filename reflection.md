@@ -12,6 +12,26 @@
 - Did your design change during implementation?
 - If yes, describe at least one change and why you made it.
 
+**c. Core user actions**
+
+These are the three things a user should be able to do in PawPal+:
+
+1. **Set up who the plan is for.** The user enters their own name and their pet's basic
+   details (name, species) so the app knows whose day it is planning. This information is
+   what lets the app address the plan to a specific pet rather than producing a generic
+   checklist.
+
+2. **Build up a list of care tasks.** The user adds the things their pet needs — a walk,
+   feeding, medication, grooming, playtime — and for each one says roughly how long it
+   takes and how important it is. They can keep adding tasks, and revise or remove ones
+   they got wrong, until the list reflects a realistic day.
+
+3. **Generate a daily plan and see the reasoning behind it.** The user says how much time
+   they actually have, asks the app to build a schedule, and gets back an ordered plan
+   showing when each task happens. The app also explains its choices — why high-priority
+   tasks came first, and which tasks had to be dropped or moved when the available time
+   ran out — so the user can judge whether the plan makes sense and adjust their inputs.
+
 ---
 
 ## 2. Scheduling Logic and Tradeoffs
