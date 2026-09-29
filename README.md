@@ -12,6 +12,45 @@ A busy pet owner needs help staying consistent with pet care. They want an assis
 
 Your job is to design the system first (UML), then implement the logic in Python, then connect it to the Streamlit UI.
 
+## Features
+
+**Scheduling**
+
+- **Cross-pet priority.** Every pet's tasks compete for one time budget on a single
+  timeline, so a cat's urgent medication beats a dog's optional grooming regardless of
+  which animal was added first.
+- **Sorting by time.** Tasks with a fixed window are placed first and in clock order;
+  everything else is sorted by priority, then shortest-first so leftover minutes get used.
+- **Time windows.** A task can be pinned with `earliest` / `latest` — medication at
+  breakfast, a vet call when the vet answers.
+- **Buffer-aware budgeting.** The gap between tasks is counted against the day, so a plan
+  can never overrun the time available.
+- **Partial booking (optional).** A task can be shortened to the minutes that remain
+  rather than dropped entirely.
+- **Per-pet caps (optional).** Stop one animal consuming the whole day.
+
+**Recurrence**
+
+- **Daily, weekly-by-weekday, and every-N-days** schedules.
+- **Per-date completion history**, so finishing today's walk does not cancel tomorrow's.
+- **Automatic next occurrence.** Completing a dated recurring task creates the next one.
+- **Overdue detection.** A missed occurrence is spotted and moved up the list.
+- **Look-ahead.** See what falls due on a future day before it arrives.
+
+**Conflicts and warnings**
+
+- **Clash warnings.** Two tasks wanting the same moment produce a readable warning; the
+  scheduler then shifts one rather than failing.
+- **Dose spacing.** `min_gap_from` holds a repeat dose a set number of hours after the first.
+- **Rest gaps.** `avoid_after` keeps a brisk walk from starting the moment feeding ends.
+- **Over-commitment warning** before you read the timetable, not after.
+- **Every omission explained.** Nothing is dropped silently; skipped tasks are listed with
+  a reason, highest priority first.
+
+**Filtering**
+
+- By pet, by pending/complete status, and by a minimum priority floor.
+
 ## What you will build
 
 Your final app should:
@@ -279,12 +318,144 @@ rule-based one is never duplicated.
 
 ## 📸 Demo Walkthrough
 
-Describe your app in numbered steps so a reader can follow along without watching a video:
+There are two ways to run PawPal+: the Streamlit app for interactive use, and
+`main.py` for a scripted tour of the logic in the terminal.
 
-1. <!-- Describe this step -->
-2. <!-- Describe this step -->
-3. <!-- Describe this step -->
-4. <!-- Describe this step -->
-5. <!-- Add more steps as needed -->
+### The Streamlit app
+
+```bash
+streamlit run app.py
+```
+
+**What you can do**
+
+| Area | Actions |
+|------|---------|
+| Sidebar — *Your day* | Set your name, how many minutes you have, and what time the day starts |
+| Sidebar — *Scheduling style* | Set the gap between tasks, allow tasks to be shortened to fit, cap the minutes any one pet can take |
+| Sidebar — *Filters* | Limit the plan to chosen pets, or to a minimum priority |
+| Pets | Add a pet with name, species and breed. Duplicate names are refused |
+| Add a care task | Choose the pet, title, duration, priority and notes; set it to repeat daily, weekly on chosen weekdays, or every N days; optionally pin it to a fixed time window |
+| On the list | See every task in the order the day will run, mark one done, or remove it. A repeating task shows ↻, a timed one shows its time, a finished one is struck through |
+| Today's schedule | Generate the timetable, see the time breakdown, read why the plan looks the way it does |
+
+**An example workflow**
+
+1. **Add a second pet.** Type `Biscuit`, choose `cat`, press **Add pet**. A green
+   confirmation appears and Biscuit joins the pet list.
+2. **Give Mochi a routine task.** Task `Morning walk`, 30 minutes, high priority, repeats
+   `daily`. Press **Add task**.
+3. **Give Biscuit a timed task.** Task `Meds`, 5 minutes, high priority, note
+   `with food`, tick **This task has a fixed time window**, set *Not before* 08:00 and
+   *Finish by* 09:00.
+4. **Create a clash on purpose.** Add `Vet call` for Mochi and `Groomer call` for Biscuit,
+   both 30 minutes, both pinned to 09:00. A warning appears immediately, while you are
+   still looking at the form:
+
+   > ⚠️ clash: Vet call (Mochi) 09:00-09:30 overlaps Groomer call (Biscuit) 09:00-09:30.
+   > One of them will be moved to the next free slot.
+
+5. **Generate the schedule.** The timetable appears with four metrics above it — tasks
+   scheduled, minutes on tasks, minutes on gaps, minutes spare. The shifted appointment is
+   labelled `moved from 09:00` in its own column, so a rescheduled vet call cannot be
+   missed at a glance.
+6. **Mark something done.** Press **Done** on the morning walk. It is struck through, and
+   because it repeats daily it reappears under **Due tomorrow**.
+7. **Read the reasoning.** Open *Why this plan?* for a line-by-line explanation, and
+   *Left out* for anything that did not fit and why.
+
+**Key scheduler behaviors on show**
+
+- *Sorting* — the task list and the timetable are both ordered by `Scheduler.sort_by_time()`
+  and the planning sort, not by the order you typed things in.
+- *Conflict warnings* — raised by `Scheduler.detect_conflicts()` as soon as a clash exists,
+  repeated above the timetable, and resolved by shifting rather than failing.
+- *Filtering* — the sidebar filters feed straight into `build_household_plan()`.
+- *Recurrence* — repeating tasks return the next day via the completion history, and
+  **Due tomorrow** previews them with `Scheduler.tasks_due_on()`.
+- *Honest accounting* — the metrics separate task time from gap time, so the spare figure
+  is real.
+
+### The terminal demo
+
+```bash
+python main.py
+```
+
+Builds an owner with two pets and eleven tasks **added deliberately out of order**, then
+walks through the logic in five sections. Abridged output:
+
+```
+======================================================================
+1. Sorting — as entered, then sorted by time
+======================================================================
+As entered:
+  Grooming (45 min) [low]
+  Vet call (30 min) [high] {from 09:00}
+  Nail trim (15 min) [low]
+  Morning walk (30 min) [high]
+  ...
+
+Sorted by time (untimed tasks last):
+  08:00  Meds
+  09:00  Vet call
+  09:00  Groomer call
+    --    Grooming
+    --    Nail trim
+
+======================================================================
+2. Filtering — by pet, then by status
+======================================================================
+  Mochi: Grooming, Vet call, Nail trim, Morning walk, Training, Breakfast
+  Biscuit: Play session, Groomer call, Litter box, Meds, Meds (evening)
+
+  (marked Training complete)
+  complete: Training
+
+======================================================================
+3. Conflict detection
+======================================================================
+  ! clash: Vet call (Mochi) 09:00-09:30 overlaps Groomer call (Biscuit) 09:00-09:20
+
+======================================================================
+4. TODAY'S SCHEDULE — Tuesday, 29 September 2026
+======================================================================
+Jordan has 180 minutes from 08:00, across 2 pets (Mochi, Biscuit).
+
+  ! over-committed by 45 min: 9 task(s) need 225 min but only 180 are available
+  ! clash: Vet call (Mochi) 09:00-09:30 overlaps Groomer call (Biscuit) 09:00-09:20
+----------------------------------------------------------------------
+  08:00 - 08:05  Meds           Biscuit    5 min  [high]
+                 note: with food
+  08:10 - 08:20  Breakfast      Mochi     10 min  [high]
+  08:25 - 08:40  Litter box     Biscuit   15 min  [medium]
+  09:00 - 09:20  Groomer call   Biscuit   20 min  [high]
+  09:25 - 09:55  Vet call       Mochi     30 min  [high]
+  10:00 - 10:30  Morning walk   Mochi     30 min  [high]
+  10:35 - 11:00  Play session   Biscuit   25 min  [low]
+  14:05 - 14:10  Meds (evening) Biscuit    5 min  [high]
+
+  Not today:
+    Training (Mochi) — already done
+    Nail trim (Mochi) — not due on 2026-09-29
+    Grooming (Mochi) — needs 45 min, only 0 min left
+
+----------------------------------------------------------------------
+  175 of 180 minutes used (140 on tasks, 35 on gaps), 5 to spare.
+
+======================================================================
+5. Recurrence — completing a daily task rolls it forward
+======================================================================
+  completed Breakfast for 2026-09-29
+  created   Breakfast due 2026-09-30 (id m2@2026-09-30)
+  task count 6 -> 7
+```
 
 **Screenshot or video** *(optional)*: <!-- Insert a screenshot or link to a demo video here -->
+
+## 📐 System Diagram
+
+The final class design is in [`diagrams/uml_final.mmd`](diagrams/uml_final.mmd), verified
+against `pawpal_system.py` so every class, attribute and method on the diagram exists in
+the code. [`diagrams/uml.mmd`](diagrams/uml.mmd) is kept alongside it as the diagram the
+build was driven from.

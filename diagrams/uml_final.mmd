@@ -1,0 +1,105 @@
+classDiagram
+    %% PawPal+ final class design, matching pawpal_system.py.
+    %% Owner and Pet and CareTask hold the data; Scheduler holds the decisions.
+
+    class Owner {
+        +str name
+        +int available_minutes
+        +time preferred_start_time
+        +list~Pet~ pets
+        +add_pet(Pet pet) None
+        +get_pet(str name) Pet
+    }
+
+    class Pet {
+        +str name
+        +str species
+        +str breed
+        +int age_years
+        +list~CareTask~ tasks
+        +add_task(CareTask task) None
+        +remove_task(str task_id) bool
+        +update_task(str task_id, dict fields) bool
+        +mark_task_complete(str task_id, date day) CareTask
+        +filter_tasks(str status, date day) list~CareTask~
+        +list_tasks(date day, bool include_complete) list~CareTask~
+        -find_task(str task_id) CareTask
+    }
+
+    class CareTask {
+        +str task_id
+        +str title
+        +int duration_minutes
+        +str priority
+        +str recurrence
+        +str notes
+        +date start_date
+        +set~str~ weekdays
+        +int interval_days
+        +time earliest
+        +time latest
+        +date due_date
+        +str min_gap_from
+        +int min_gap_minutes
+        +set~str~ avoid_after
+        +int avoid_after_minutes
+        +set~date~ completed_on
+        +int priority_rank
+        +str status
+        +str base_id
+        +bool is_complete
+        +bool is_anchored
+        +effective_rank(date day) int
+        +is_complete_on(date day) bool
+        +mark_complete(date day) None
+        +mark_incomplete(date day) None
+        +is_due_today(date day) bool
+        +next_due_date(date after) date
+        +spawn_next_occurrence(date after) CareTask
+        +previous_due_date(date day) date
+        +is_overdue(date day) bool
+        +fits_in(int remaining_minutes) bool
+        +summary() str
+    }
+
+    class Scheduler {
+        +bool allow_partial
+        +int buffer_minutes
+        +int max_minutes_per_pet
+        +build_plan(Owner owner, Pet pet, date plan_date, str min_priority) dict
+        +build_household_plan(Owner owner, date plan_date, list only_pets, str min_priority) dict
+        +sort_by_time(list~CareTask~ tasks) list~CareTask~
+        +filter_tasks(Owner owner, str pet_name, str status, date day) list
+        +detect_conflicts(Owner owner, date day) list~str~
+        +tasks_due_on(Owner owner, date day) list
+        +upcoming(dict plan, time now) list~dict~
+        +explain(dict plan) str
+        -plan_items(list items, Owner owner, date plan_date, str min_priority) dict
+        -filter_items(list items, date plan_date, str min_priority) tuple
+        -warnings(list candidates, Owner owner) list~str~
+        -conflict_warnings(list candidates) list~str~
+        -sort_tasks(list items, date plan_date) list
+        -select_tasks(list items, Owner owner) tuple
+        -place_one(Pet pet, CareTask task, Owner owner, dict state) dict
+        -find_slot(CareTask task, int minutes, list placements, datetime day_start) tuple
+        -earliest_legal_start(CareTask task, list placements, datetime day_start) datetime
+        -placement_of(str task_id, list placements) dict
+        -clash(datetime start, datetime end, list placements) dict
+        -minutes_used(list~dict~ entries) int
+        -assign_times(list placements) list~dict~
+    }
+
+    %% Composition: an owner's pets, a pet's tasks.
+    Owner "1" *-- "0..*" Pet : owns
+    Pet "1" *-- "0..*" CareTask : has
+
+    %% A task can point at other tasks by id, for dose spacing and rest gaps.
+    CareTask ..> CareTask : min_gap_from / avoid_after
+
+    %% A completed recurring task builds its own successor.
+    CareTask ..> CareTask : spawn_next_occurrence
+
+    %% The scheduler reads the data classes but owns none of them.
+    Scheduler ..> Owner : reads time budget
+    Scheduler ..> Pet : reads task lists
+    Scheduler ..> CareTask : sorts, filters, places

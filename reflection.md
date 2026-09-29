@@ -154,13 +154,72 @@ on a day it could still mostly deliver.
 
 **a. How you used AI**
 
-- How did you use AI tools during this project (for example: design brainstorming, debugging, refactoring)?
-- What kinds of prompts or questions were most helpful?
+I used my AI coding assistant across the whole build, but the value was very uneven
+depending on what I asked for.
+
+**What worked best**
+
+1. **Asking it to review its own output before I accepted it.** The single most useful
+   prompt of the project was asking it to review the class skeleton for missing
+   relationships and logic bottlenecks *before* any logic existed. It found three
+   contradictions between methods — `is_due_today()` needed a date that `build_plan()`
+   never received, `build_plan()` was discarding the skipped-task list that `explain()`
+   needed, and buffer time was being ignored during selection but applied during
+   placement. All three would have been painful to unpick later.
+2. **Having it run the code, not just write it.** Every claim it made was checked by
+   actually running `pytest` or `main.py` and showing me the output. That is what caught
+   the rest-gap bug described below.
+3. **Structural audits.** Asking it to walk the code with `ast` and list every method
+   missing a docstring, or every class member absent from the UML, is far more reliable
+   than asking "is my documentation complete?" and trusting the answer.
+4. **Small, scoped edits over big rewrites.** Asking for one feature at a time kept the
+   diffs reviewable. When I asked for four feature areas at once, the result needed two
+   rounds of correction.
+
+**What worked less well**
+
+Open-ended requests like "make the scheduler smarter" produced plausible code that did not
+match how a pet owner actually thinks about their morning. The narrower the question, the
+better the answer.
 
 **b. Judgment and verification**
 
-- Describe one moment where you did not accept an AI suggestion as-is.
-- How did you evaluate or verify what the AI suggested?
+**The example I keep coming back to: cross-pet priority.**
+
+When I first saw the two-pet schedule, the dog's low-priority grooming had taken the whole
+budget and the cat's medium-priority litter box got nothing. I asked why. The assistant
+explained that priority only sorted *within* a pet, offered three options, and recommended
+the cheapest one: leave the behavior alone and write it up as a tradeoff.
+
+I disagreed. Finishing one animal before starting the other is defensible for a tidy
+codebase but wrong for the actual user — nobody grooms one pet while the other's
+medication goes undone. I told it to implement cross-pet priority instead. That meant
+restructuring the scheduler to work on `(pet, task)` pairs rather than bare tasks, which
+was more work than the recommended option, but it is the behavior the app exists to
+provide.
+
+**A second case, where the evidence corrected both of us.**
+
+I asked for a rule preventing a walk from being scheduled straight after feeding. The
+assistant implemented `avoid_after` as "must not immediately follow", which sounded right.
+Running the demo showed the walk had been pushed to **14:15** — past the evening
+medication — because that was technically the first slot not immediately after breakfast.
+The rule was satisfied and the schedule was nonsense.
+
+The fix was to change what the rule *means*: not "must not follow", but "must rest 30
+minutes after". The walk moved to 08:50 and another pet's task filled the gap. This is the
+clearest lesson of the project for me — the code did exactly what was asked, and what was
+asked was wrong. I only found out because I read the output of a real run instead of
+trusting that passing code was correct code.
+
+**How I verified things generally**
+
+- Ran `python -m pytest` after every change; the suite grew to 49 tests.
+- Ran `main.py` and actually read the timetable, rather than checking it did not crash.
+- Exercised the Streamlit app with Streamlit's `AppTest` harness, so UI wiring was proven
+  rather than assumed.
+- Checked documentation against code mechanically — the UML is verified member by member
+  against `pawpal_system.py`, so it cannot quietly drift.
 
 ---
 
@@ -168,13 +227,55 @@ on a day it could still mostly deliver.
 
 **a. What you tested**
 
-- What behaviors did you test?
-- Why were these tests important?
+49 tests in `tests/test_pawpal.py`, grouped by the behavior they protect:
+
+- **Sorting** — tasks return in chronological order with untimed ones last; the planning
+  sort respects window, priority, duration and pet together.
+- **Filtering** — by pet name, by pending/complete status, and by a minimum priority.
+- **Recurrence** — daily, weekly-by-weekday and interval schedules; completing a dated
+  daily task creates tomorrow's copy; a rule-based task never duplicates itself.
+- **Conflicts** — two tasks at the same time warn and still get scheduled; back-to-back
+  tasks are not flagged; dose spacing and rest gaps are enforced.
+- **Time budget** — gaps count against the day, over-commitment is warned about, per-pet
+  caps hold, and partial booking shortens a task to fit.
+- **Edge cases** — a pet with no tasks, an owner with no pets, a zero-minute day, a
+  sliver of time too small to use, an empty sort.
+- **Guard rails** — duplicate ids and pet names rejected, missing-id operations report
+  failure instead of raising, an invalid edit rolls back.
+
+The tests that matter most are the ones tied to a specific way an owner could be let
+down. `test_completion_is_per_day_so_daily_tasks_come_back` exists because an early
+version of the code marked a task complete forever, which would have silently cancelled a
+daily medication from the second day onward. `test_buffer_is_counted_against_the_budget`
+exists because selection and placement originally disagreed about whether gaps were real
+time, so the app would promise a day that could not physically happen.
 
 **b. Confidence**
 
-- How confident are you that your scheduler works correctly?
-- What edge cases would you test next if you had more time?
+**Four out of five.** Every rule the scheduler enforces has at least one test that fails
+if the rule is removed, and the edge cases that usually break schedulers — empty inputs, a
+zero-minute day, two tasks wanting one slot — are all pinned down. Several tests exist
+because a real bug was found by reading demo output, which makes me trust them more than
+tests written purely from imagination.
+
+What stops me saying five:
+
+- **Constraint interactions are under-tested.** Each rule is checked mostly in isolation.
+  A task that is simultaneously time-windowed, overdue, and subject to a rest gap takes a
+  path no single test covers.
+- **Only legality is tested, not quality.** The tests confirm a plan is valid; none assert
+  it is the *best* arrangement, because the greedy algorithm does not promise one.
+- **No randomised or property-based testing.** Every scenario is hand-picked, so an
+  unusual combination of durations and windows could still surprise it.
+- **The Streamlit layer is not in the suite.** It was checked by hand with `AppTest`
+  during development, but those checks were not kept.
+
+With more time, in order: a combined-constraint test built from the hardest realistic
+morning I can construct; a property-based test asserting the invariants that must always
+hold (no overlaps, never exceeding the budget, every task either scheduled or explained);
+a test for a task longer than the entire day; behavior across a midnight boundary, which I
+suspect is currently wrong since times are compared on a single fixed date; and keeping
+the `AppTest` checks as real tests.
 
 ---
 
@@ -182,12 +283,71 @@ on a day it could still mostly deliver.
 
 **a. What went well**
 
-- What part of this project are you most satisfied with?
+The part I am most satisfied with is that **the scheduler explains itself**. Every plan
+carries the reasoning for what was scheduled and a specific reason for everything that was
+not — "needs 45 min, only 5 min left", "not due on 2026-09-29", "already done". Nothing
+disappears quietly. That turned out to matter more than I expected: almost every bug I
+found, I found by reading an explanation that did not make sense, not by a test failing.
+
+I am also glad I separated the data classes from the decision-making. `Owner`, `Pet` and
+`CareTask` hold state; `Scheduler` reads them and owns every rule. That made the private
+helpers — sorting, selection, placement — testable one at a time, and it meant adding
+cross-pet scheduling changed one class rather than four.
 
 **b. What you would improve**
 
-- If you had another iteration, what would you improve or redesign?
+**The plan is still a dictionary.** `build_household_plan()` returns
+`{"plan_date", "entries", "skipped", "warnings", "minutes_used"}`, and every consumer
+reaches into it by string key. I kept it that way to stay inside the four-class design,
+but it is the weakest part of the code: a typo in a key fails at runtime rather than
+immediately, and the shape is documented only in a docstring. A `DailyPlan` class would
+fix that, and I would do it first in another iteration.
+
+**Placement is greedy and never reconsiders.** It gives each task the earliest legal slot
+and moves on. When the day is tight, a long high-priority task can occupy time that two
+shorter tasks would have used better. A best-fit pass would produce better days.
+
+**The two recurrence models are more than this app needs.** Supporting both rule-based
+recurrence and dated chains satisfied two different requirements, but a reader has to hold
+both in their head, and `is_due_today()` branches on which one is in play. If I were
+starting again I would pick one — probably rule-based — and say so plainly.
 
 **c. Key takeaway**
 
-- What is one important thing you learned about designing systems or working with AI on this project?
+**Working code is not evidence of correct design.** The `avoid_after` rule passed its
+test, matched its docstring, and produced a schedule that put a dog's walk at 14:15 for no
+sane reason. The implementation was perfect; the rule I had asked for was wrong. I only
+caught it because I read the actual output of a real run.
+
+The lesson I am taking forward is that the specification is the part worth arguing about,
+and the only reliable way to check a specification is to look at what the system produces
+for a realistic case — not at whether it runs, and not at whether the tests are green.
+
+**d. AI strategy**
+
+**On organising the work.** I ran most of this project as one long continuous
+conversation rather than separate sessions per phase. That had a real benefit — the
+assistant remembered why `avoid_after` had been redesigned, so it did not reintroduce the
+old semantics later, and it could keep the UML and README in step with the code without
+being re-briefed each time. It also had a cost: by the testing phase, the context was full
+of design discussion, and it took a deliberate "audit what already exists before writing
+anything" step to stop it re-adding tests that were already there. A fresh session for
+testing would have forced that audit naturally instead of me having to ask for it. My
+rule for next time: keep one session per *artifact* being changed, and start a new one
+whenever the job shifts from building to checking, because checking works better without
+the bias of having just written the thing.
+
+**On being the lead architect.** The assistant was consistently faster than me at
+producing code and consistently worse than me at deciding what the code should do. Its
+default is to satisfy the request in front of it; it recommended documenting the cross-pet
+problem as a tradeoff rather than fixing it, because that was the smaller change, and it
+was only wrong because it did not weigh what an owner would actually care about. Every
+decision that shaped this project — cross-pet priority over per-pet convenience, the rest
+gap over the adjacency rule, supporting both recurrence models, four stars instead of five
+— was a judgement call about the user, not a technical one, and those were mine to make.
+
+What I got better at was the shape of the questions. "Add conflict detection" produces
+something. "Review this for missing relationships and bottlenecks before we write any
+logic" produces the three design flaws I would otherwise have shipped. Asking it to check
+its own work against the running program, rather than accepting its description of what it
+built, is the habit I want to keep.
