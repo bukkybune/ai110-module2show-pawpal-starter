@@ -97,13 +97,56 @@ These are the three things a user should be able to do in PawPal+:
 
 **a. Constraints and priorities**
 
-- What constraints does your scheduler consider (for example: time, priority, preferences)?
-- How did you decide which constraints mattered most?
+My scheduler works against five constraints:
+
+1. **Total time available.** The owner says how many minutes they have, and the plan can
+   never exceed it. The gaps between tasks count against this too, because five minutes
+   of walking between jobs is five minutes genuinely gone.
+2. **Priority.** High beats medium beats low, across all pets rather than within one.
+3. **Time windows.** Some tasks are not free to float — medication has to land with
+   breakfast, the vet call happens when the vet answers. These get `earliest`/`latest`
+   and claim their slots before anything else is placed.
+4. **Spacing rules.** Two doses of the same medication need hours between them
+   (`min_gap_from`), and a brisk walk should not start the moment a deep-chested dog
+   finishes eating (`avoid_after`).
+5. **Recurrence.** A task only competes for time on a day it is actually due.
+
+I decided the order by asking what an owner would be most upset to get wrong. Missing a
+medication dose is worse than missing a grooming session, so priority outranks
+convenience. But a *timed* task outranks even a high-priority floating one, because a
+task with a window either happens in that window or does not happen at all — whereas a
+floating task is only ever moved, never lost. That is why anchored tasks are sorted first
+and placed before the rest of the day is filled in.
 
 **b. Tradeoffs**
 
-- Describe one tradeoff your scheduler makes.
-- Why is that tradeoff reasonable for this scenario?
+**The scheduler places tasks greedily, and never reconsiders a placement.**
+
+It walks the task list in priority order and gives each task the earliest legal slot it
+can find. Once a task is placed, it stays placed. This is a deliberate tradeoff against
+an optimal packing algorithm, which would try combinations to find the arrangement that
+fits the most valuable set of tasks into the day.
+
+The cost is real and I can point at it in my own output. When the day is tight, a long
+high-priority task can consume time that two shorter medium-priority tasks would have
+filled more usefully, and the scheduler will never notice. A best-fit or knapsack
+approach would do better on exactly that case.
+
+I think the tradeoff is reasonable here for three reasons. First, the greedy rule is one
+an owner can hold in their head — "most important first, and shorter things first when
+they tie" — so when the plan looks wrong they can see *why* and fix their inputs. An
+optimal packer produces better schedules that are harder to argue with. Second, the
+failure mode is mild: the worst case is some unused minutes at the end of the day, which
+the plan reports honestly rather than hiding. Third, the day is small. With eight or ten
+tasks the difference between greedy and optimal is a few minutes, not a missed dose.
+
+A second, narrower tradeoff worth naming: **conflict detection compares the requested
+time windows, not the final schedule.** If two tasks both ask for 09:00, I warn about it,
+but the scheduler then quietly shifts the loser to the next free slot rather than
+refusing to plan. So the warning describes an intent that clashed, not a timetable that
+is broken — the printed plan never actually contains two overlapping entries. I chose
+that because a warning the owner can ignore is more useful than a scheduler that gives up
+on a day it could still mostly deliver.
 
 ---
 
