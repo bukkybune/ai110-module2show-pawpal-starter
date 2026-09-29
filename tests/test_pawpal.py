@@ -439,6 +439,127 @@ def test_tasks_that_merely_touch_are_not_a_conflict():
     assert Scheduler().detect_conflicts(owner, TUESDAY) == []
 
 
+# --- Empty and degenerate cases ------------------------------------------
+
+
+def test_pet_with_no_tasks_plans_an_empty_day():
+    """A pet with nothing to do should produce an empty plan, not an error."""
+    owner, _ = make_owner()
+
+    plan = Scheduler().build_household_plan(owner, TUESDAY)
+
+    assert plan["entries"] == []
+    assert plan["skipped"] == []
+    assert plan["minutes_used"] == 0
+
+
+def test_owner_with_no_pets_plans_an_empty_day():
+    """No pets at all is a valid, if quiet, household."""
+    owner = Owner("Jordan", available_minutes=120, preferred_start_time=time(8, 0))
+
+    plan = Scheduler().build_household_plan(owner, TUESDAY)
+
+    assert plan["entries"] == []
+    assert Scheduler().detect_conflicts(owner, TUESDAY) == []
+
+
+def test_day_with_no_minutes_schedules_nothing_but_explains_why():
+    """A zero-minute day should skip everything with a reason, not crash."""
+    owner, pet = make_owner(minutes=0)
+    pet.add_task(CareTask("t1", "Walk", 30, "high"))
+
+    plan = Scheduler().build_household_plan(owner, TUESDAY)
+
+    assert plan["entries"] == []
+    assert "only 0 min left" in reasons(plan["skipped"])["Walk"]
+
+
+def test_sort_by_time_handles_an_empty_list():
+    """Sorting nothing should return nothing rather than failing."""
+    assert Scheduler().sort_by_time([]) == []
+
+
+# --- Partial scheduling ---------------------------------------------------
+
+
+def test_allow_partial_shortens_a_task_to_fit():
+    """With partial booking on, a long task takes the time that is left."""
+    owner, pet = make_owner(minutes=20)
+    pet.add_task(CareTask("t1", "Long walk", 30, "high"))
+
+    plan = Scheduler(allow_partial=True).build_household_plan(owner, TUESDAY)
+
+    assert len(plan["entries"]) == 1
+    assert plan["entries"][0]["scheduled_minutes"] == 20
+    assert "shortened from 30 min" in plan["entries"][0]["reason"]
+
+
+def test_a_sliver_of_time_is_not_worth_scheduling():
+    """Below the partial minimum, the task is skipped rather than tokenised."""
+    owner, pet = make_owner(minutes=3)
+    pet.add_task(CareTask("t1", "Long walk", 30, "high"))
+
+    plan = Scheduler(allow_partial=True).build_household_plan(owner, TUESDAY)
+
+    assert plan["entries"] == []
+
+
+# --- Guard rails on the task list ----------------------------------------
+
+
+def test_duplicate_task_id_is_rejected():
+    """Two tasks sharing an id would make remove and update ambiguous."""
+    pet = Pet("Mochi", "dog")
+    pet.add_task(CareTask("t1", "Walk", 30, "high"))
+
+    with pytest.raises(ValueError, match="already has a task"):
+        pet.add_task(CareTask("t1", "Different walk", 20, "low"))
+
+
+def test_duplicate_pet_name_is_rejected():
+    """Two pets with one name would make get_pet ambiguous."""
+    owner, _ = make_owner()
+
+    with pytest.raises(ValueError, match="already has a pet"):
+        owner.add_pet(Pet("Mochi", "cat"))
+
+
+def test_operations_on_a_missing_task_report_failure():
+    """Removing or updating an unknown id returns False, it does not raise."""
+    pet = Pet("Mochi", "dog")
+
+    assert pet.remove_task("nope") is False
+    assert pet.update_task("nope", {"title": "New"}) is False
+    assert pet.mark_task_complete("nope") is None
+
+
+def test_a_rejected_edit_leaves_the_task_untouched():
+    """An invalid update must roll back, not half-apply."""
+    pet = Pet("Mochi", "dog")
+    pet.add_task(CareTask("t1", "Walk", 30, "high"))
+
+    with pytest.raises(ValueError):
+        pet.update_task("t1", {"duration_minutes": -5})
+
+    assert pet.list_tasks()[0].duration_minutes == 30
+    assert pet.update_task("t1", {"duration_minutes": 25}) is True
+    assert pet.list_tasks()[0].duration_minutes == 25
+
+
+def test_explain_covers_both_what_ran_and_what_did_not():
+    """The explanation has to account for skipped tasks, not just the plan."""
+    owner, pet = make_owner(minutes=15)
+    pet.add_task(CareTask("t1", "Meds", 5, "high"))
+    pet.add_task(CareTask("t2", "Grooming", 45, "low"))
+
+    scheduler = Scheduler()
+    text = scheduler.explain(scheduler.build_household_plan(owner, TUESDAY))
+
+    assert "Meds" in text
+    assert "Grooming" in text
+    assert "Left out" in text
+
+
 # --- Validation ----------------------------------------------------------
 
 

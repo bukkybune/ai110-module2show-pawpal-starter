@@ -151,18 +151,58 @@ Things to notice in the output:
 ## 🧪 Testing PawPal+
 
 ```bash
-# Run the full test suite:
-pytest
-
-# Run with coverage:
-pytest --cov
+python -m pytest
 ```
 
-Sample test output:
+49 tests in `tests/test_pawpal.py`, covering both the happy paths and the edge cases:
+
+| Area | What is verified |
+|------|------------------|
+| Sorting | Tasks return in chronological order, untimed ones last; planning order respects window, priority, duration and pet |
+| Filtering | By pet name, by pending/complete status, and by a minimum priority floor |
+| Recurrence | Daily, weekly-by-weekday and interval schedules; completing a dated daily task creates tomorrow's copy; rule-based tasks never duplicate |
+| Conflicts | Two tasks at the same time produce a warning and still get scheduled; back-to-back tasks are not flagged; rest gaps and dose spacing are enforced |
+| Time budget | Gaps count against the day; over-commitment is warned about; per-pet caps hold; partial booking shortens a task to fit |
+| Completion | Status is stored per date, so finishing today does not cancel tomorrow; overdue tasks are detected and moved up |
+| Edge cases | A pet with no tasks, an owner with no pets, a zero-minute day, a sliver of time too small to use, an empty sort |
+| Guard rails | Duplicate task ids and pet names rejected; missing ids report failure instead of raising; an invalid edit rolls back |
+
+Test run:
 
 ```
-# Paste your pytest output here
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/dorcasibrahim/ai110-module2show-pawpal-starter-1
+collected 49 items
+
+tests/test_pawpal.py .................................................   [100%]
+
+============================== 49 passed in 0.09s ==============================
 ```
+
+### Confidence level
+
+**★★★★☆ (4 / 5)**
+
+Four stars rather than five. The scheduling rules themselves are well covered — every
+constraint the scheduler enforces has at least one test that fails if the rule is removed,
+and the edge cases that usually break schedulers (empty inputs, a zero-minute day, two
+tasks wanting one slot) are all pinned down. Two tests exist specifically because a bug was
+found while building the demo rather than by writing tests first, which is a good sign that
+the suite reflects real failures.
+
+What holds it back from five:
+
+- **Interactions between constraints are under-tested.** Each rule is checked mostly on its
+  own. A task that is simultaneously anchored, overdue, and subject to a rest gap takes a
+  path no single test covers.
+- **The greedy placement is not tested for quality, only legality.** Tests confirm the plan
+  is valid; none assert it is the *best* arrangement, because the algorithm does not promise
+  one.
+- **No property-based or randomised testing.** Everything is a hand-picked scenario, so an
+  unusual combination of times and durations could still surprise it.
+- **The Streamlit layer has no automated tests.** It was verified by hand with Streamlit's
+  `AppTest` harness during development, but that is not part of the suite.
 
 ## 📐 Smarter Scheduling
 
