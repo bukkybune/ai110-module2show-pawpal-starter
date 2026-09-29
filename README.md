@@ -44,15 +44,47 @@ pip install -r requirements.txt
 
 ## 🖥️ Sample Output
 
-Paste a sample of your app's CLI or Streamlit output here so a reader can see what a generated plan looks like:
+Running the logic layer from the terminal:
+
+```bash
+python main.py
+```
+
+One owner (Jordan, 120 minutes from 08:00) with two pets and seven care tasks. All of the
+tasks compete for the same time budget on a single timeline, so priority decides what gets
+scheduled regardless of which pet a task belongs to:
 
 ```
-# e.g.:
-# Daily plan for Biscuit (Golden Retriever):
-#   08:00 — Morning walk (30 min) [priority: high]
-#   09:00 — Feeding (10 min) [priority: high]
-#   ...
+======================================================================
+TODAY'S SCHEDULE — Tuesday, 29 September 2026
+======================================================================
+Jordan has 120 minutes from 08:00, across 2 pets (Mochi, Biscuit).
+
+----------------------------------------------------------------------
+  08:00 - 08:05  Meds           Biscuit    5 min  [high]
+                 note: with food
+  08:10 - 08:20  Breakfast      Mochi     10 min  [high]
+  08:25 - 08:55  Morning walk   Mochi     30 min  [high]
+  09:00 - 09:15  Litter box     Biscuit   15 min  [medium]
+  09:20 - 09:40  Training       Mochi     20 min  [medium]
+
+  Not today:
+    Play session (Biscuit) — needs 25 min, only 15 min left
+    Grooming (Mochi) — needs 45 min, only 15 min left
+
+======================================================================
+80 of 120 minutes planned, 40 to spare.
+======================================================================
 ```
+
+Things to notice in the output:
+
+- **Priority beats pet order.** Biscuit's medium-priority litter box is scheduled ahead of
+  Mochi's low-priority grooming, even though Mochi was added to the household first.
+- **Buffers are real time.** The five-minute gaps between tasks are counted against the
+  budget during selection, so the plan cannot overrun the day.
+- **Nothing disappears silently.** Tasks that do not fit are listed with the reason they
+  were left out.
 
 ## 🧪 Testing PawPal+
 

@@ -21,6 +21,7 @@ classDiagram
         +remove_task(str task_id) bool
         +update_task(str task_id, dict fields) bool
         +list_tasks() list~CareTask~
+        -find_task(str task_id) CareTask
     }
 
     class CareTask {
@@ -30,6 +31,8 @@ classDiagram
         +str priority
         +str recurrence
         +str notes
+        +date start_date
+        +int priority_rank
         +fits_in(int remaining_minutes) bool
         +is_due_today(date day) bool
         +summary() str
@@ -38,11 +41,13 @@ classDiagram
     class Scheduler {
         +bool allow_partial
         +int buffer_minutes
-        +build_plan(Owner owner, Pet pet) list~dict~
-        +explain(list~dict~ plan) str
-        -sort_tasks(list~CareTask~ tasks) list~CareTask~
-        -select_tasks(list~CareTask~ tasks, int budget) tuple
-        -assign_times(list~CareTask~ tasks, time start) list~dict~
+        +build_plan(Owner owner, Pet pet, date plan_date) dict
+        +build_household_plan(Owner owner, date plan_date) dict
+        +explain(dict plan) str
+        -plan_items(list items, Owner owner, date plan_date) dict
+        -sort_tasks(list items) list
+        -select_tasks(list items, int budget) tuple
+        -assign_times(list items, time start) list~dict~
     }
 
     Owner "1" --> "*" Pet : owns
